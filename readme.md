@@ -15,6 +15,10 @@ and a modified version I found on
 
 [Github](https://github.com/haoict/MFC-HardwareDetect)
 
+# Prequesit
+
+[Microsoft Visual C++ 2015 Redistributable x86](https://www.microsoft.com/en-us/download/details.aspx?id=52685)
+
 # Revision
 
 | Rev  | Date   | Change  | Comment  |
