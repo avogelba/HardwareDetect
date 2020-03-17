@@ -109,8 +109,8 @@ BOOL CHWDetectDlg::OnInitDialog()
 	hSelectedDev = NULL;
 
 	// TODO: Add extra initialization here
-	ZeroMemory(&m_imgList, sizeof(SP_CLASSIMAGELIST_DATA));
-	m_imgList.cbSize = sizeof(SP_CLASSIMAGELIST_DATA);
+    ZeroMemory(&m_imgList, sizeof(SP_CLASSIMAGELIST_DATA));
+    m_imgList.cbSize = sizeof(SP_CLASSIMAGELIST_DATA);
 	BOOL b = SetupDiGetClassImageList(&m_imgList);
 	ASSERT(b);
 	int nRootImg;
@@ -125,10 +125,10 @@ BOOL CHWDetectDlg::OnInitDialog()
 	hRoot = m_ctrlTree.InsertItem(szName, n, n);
 
 	HDEVNOTIFY hDevNotify;
-	DEV_BROADCAST_DEVICEINTERFACE NotificationFilter;
-	ZeroMemory( &NotificationFilter, sizeof(NotificationFilter) );
-	NotificationFilter.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
-	NotificationFilter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+    DEV_BROADCAST_DEVICEINTERFACE NotificationFilter;
+    ZeroMemory( &NotificationFilter, sizeof(NotificationFilter) );
+    NotificationFilter.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
+    NotificationFilter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
 	for(int i=0; i<sizeof(GUID_DEVINTERFACE_LIST)/sizeof(GUID); i++) {
 		NotificationFilter.dbcc_classguid = GUID_DEVINTERFACE_LIST[i];
 		hDevNotify = RegisterDeviceNotification(this->GetSafeHwnd(), &NotificationFilter, DEVICE_NOTIFY_WINDOW_HANDLE);
@@ -220,6 +220,7 @@ LRESULT CHWDetectDlg::OnMyDeviceChange(WPARAM wParam, LPARAM lParam)
 
 			case DBT_DEVTYP_VOLUME:
 				pDevVolume = (PDEV_BROADCAST_VOLUME)pHdr;
+				UpdateDriveInfo(pDevVolume, wParam);
 				break;
 		}
 	}
@@ -235,18 +236,58 @@ LRESULT CHWDetectDlg::OnMyDeviceChange(WPARAM wParam, LPARAM lParam)
 #else
 #define DEFINE_DEVPROPKEY(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8, pid) EXTERN_C const DEVPROPKEY name
 #endif // INITGUID
-DEFINE_DEVPROPKEY(DEVPKEY_Device_BusReportedDeviceDesc,  0x540b947e, 0x8b40, 0x45bc, 0xa8, 0xa2, 0x6a, 0x0b, 0x89, 0x4c, 0xbd, 0xa2, 4);     // DEVPROP_TYPE_STRING
-typedef BOOL (WINAPI *FN_SetupDiGetDevicePropertyW)(
+DEFINE_DEVPROPKEY(DEVPKEY_Device_BusReportedDeviceDesc, 0x540b947e, 0x8b40, 0x45bc, 0xa8, 0xa2, 0x6a, 0x0b, 0x89, 0x4c, 0xbd, 0xa2, 4);     // DEVPROP_TYPE_STRING
+typedef BOOL(WINAPI* FN_SetupDiGetDevicePropertyW)(
 	__in       HDEVINFO DeviceInfoSet,
 	__in       PSP_DEVINFO_DATA DeviceInfoData,
-	__in       const DEVPROPKEY *PropertyKey,
-	__out      DEVPROPTYPE *PropertyType,
+	__in       const DEVPROPKEY* PropertyKey,
+	__out      DEVPROPTYPE* PropertyType,
 	__out_opt  PBYTE PropertyBuffer,
 	__in       DWORD PropertyBufferSize,
 	__out_opt  PDWORD RequiredSize,
 	__in       DWORD Flags
 	);
 
+char CHWDetectDlg::DriveLetterFromMask(ULONG unit_mask)
+{
+	char i;
+
+	// check each bit one at a time.
+	for (i = 0; i < 26; ++i)
+	{
+		// Check to see if the bit is set
+		if (unit_mask & 0x1)
+			break;
+
+		// Shift the bit mast
+		unit_mask = unit_mask >> 1;
+	}
+
+	// Return uppercase drive letter.
+	return (i + 'A');
+}
+
+void CHWDetectDlg::UpdateDriveInfo(PDEV_BROADCAST_VOLUME pDevVolume,WPARAM wParam)
+{
+	char drive[] = "x:\\";
+
+	// Find drive from mask.
+	drive[0] = DriveLetterFromMask(pDevVolume->dbcv_unitmask);
+
+	CString szLog;
+	m_ctrlEdit.GetWindowText(szLog);
+
+	CString szTmp;
+	if (DBT_DEVICEARRIVAL == wParam) {
+		szTmp.Format(_T("Adding Device as drive %s\r\n"), drive);
+	}
+	else {
+		szTmp.Format(_T("Removing drive %s\r\n"), drive);
+	}
+
+	szLog.Append(szTmp);
+	m_ctrlEdit.SetWindowText(szLog);
+}
 
 void CHWDetectDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam)
 {
@@ -310,6 +351,7 @@ void CHWDetectDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM w
 		}
 
 
+
 		//////////////
 		DEVPROPTYPE ulPropertyType;
 		WCHAR szBuffer[4096];
@@ -317,25 +359,24 @@ void CHWDetectDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM w
 		DWORD dwSize;
 
 		FN_SetupDiGetDevicePropertyW fn_SetupDiGetDevicePropertyW = (FN_SetupDiGetDevicePropertyW)
-			GetProcAddress (GetModuleHandle (TEXT("Setupapi.dll")), "SetupDiGetDevicePropertyW");
-		if (fn_SetupDiGetDevicePropertyW && fn_SetupDiGetDevicePropertyW (hDevInfo, &spDevInfoData, &DEVPKEY_Device_BusReportedDeviceDesc,
+			GetProcAddress(GetModuleHandle(TEXT("Setupapi.dll")), "SetupDiGetDevicePropertyW");
+		if (fn_SetupDiGetDevicePropertyW && fn_SetupDiGetDevicePropertyW(hDevInfo, &spDevInfoData, &DEVPKEY_Device_BusReportedDeviceDesc,
 			&ulPropertyType, (BYTE*)szBuffer, sizeof(szBuffer), &dwSize, 0)) {
 
-				if (fn_SetupDiGetDevicePropertyW (hDevInfo, &spDevInfoData, &DEVPKEY_Device_BusReportedDeviceDesc,
-					&ulPropertyType, (BYTE*)szBuffer, sizeof(szBuffer), &dwSize, 0))
-				{
-					_tprintf (TEXT("     Bus Reported Device Description: \"%ls\"\n"), szBuffer);
+			if (fn_SetupDiGetDevicePropertyW(hDevInfo, &spDevInfoData, &DEVPKEY_Device_BusReportedDeviceDesc,
+				&ulPropertyType, (BYTE*)szBuffer, sizeof(szBuffer), &dwSize, 0))
+			{
+				_tprintf(TEXT("     Bus Reported Device Description: \"%ls\"\n"), szBuffer);
 
-					CString deviceName(szBuffer); 
-					deviceName += "\r\n";
-					szLog.Append(deviceName);
-					m_ctrlEdit.SetWindowText(szLog);
+				CString deviceName(szBuffer);
+				deviceName += "\r\n";
+				szLog.Append(deviceName);
+				m_ctrlEdit.SetWindowText(szLog);
 
-					lstrcpy(buf, deviceName);
-				}
+				lstrcpy(buf, deviceName);
+			}
 		}
 		//////////////
-
 
 		HTREEITEM hClass = GetClassItem(&(spDevInfoData.ClassGuid), wParam);
 		// hClass can only be NULL for remove device and class node is not found

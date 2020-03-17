@@ -43,6 +43,8 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	afx_msg LRESULT OnMyDeviceChange(WPARAM wParam, LPARAM lParam);
+	char CHWDetectDlg::DriveLetterFromMask(ULONG unit_mask);
+	void CHWDetectDlg::UpdateDriveInfo(PDEV_BROADCAST_VOLUME pDevVolume, WPARAM wParam);
 	void UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 	CString GetClassDesc(const GUID* pGuid);
 	int GetClassImgIndex(const GUID* pGuid);

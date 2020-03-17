@@ -1,0 +1,1 @@
+Open license, use at your own risk, enjoy
